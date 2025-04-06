@@ -1,0 +1,50 @@
+name: Build
+on:
+  push:
+    branches:
+      - master
+jobs:
+  build-project:
+    name: Build Project
+    runs-on: windows-2025
+    steps:
+      - name: Checkout Project
+        uses: actions/checkout@v4.2.2
+        with:
+            submodules: recursive
+
+      - name: Declare some variables
+        id: vars
+        shell: bash
+        run: |
+          echo "version=$(date -u +"%Y.%m.%d")" >> $GITHUB_OUTPUT
+          echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Build Project
+        uses: lukka/run-cmake@v10
+        with:
+          cmakeListsTxtPath: '${{ github.workspace }}/projects/main/CMakeLists.txt'
+          configurePreset: default
+          buildPreset: default
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dmwatcher
+          path: |
+            build_*/Debug
+            build_*/Release
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          prerelease: false
+          make_latest: true
+          name: ${{ steps.vars.outputs.version }}_${{ steps.vars.outputs.sha_short }}
+          tag_name: ${{ steps.vars.outputs.version }}_${{ steps.vars.outputs.sha_short }}
+          files: |
+            build_*/Debug/dmwatcher.exe
+            build_*/Debug/dmwatcher.pdb
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT }}
