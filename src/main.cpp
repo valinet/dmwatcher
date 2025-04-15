@@ -20,12 +20,12 @@ BOOL WINAPI CtrlHandler(DWORD ctrlType) noexcept {
 
 int main() noexcept {
     DWORD waitStatus = WAIT_FAILED;
-	HANDLE hDir = nullptr;
+    HANDLE hDir = nullptr;
     char buffer[8192]{};
     DWORD bytesReturned = 0;
     OVERLAPPED overlapped = {};
     HANDLE hChangeEvent = nullptr;
-	int argc = 0;
+    int argc = 0;
     auto argv = CommandLineToArgvW(GetCommandLineW(), &argc);
 
     if (argv == nullptr || argc < 2) {
@@ -39,8 +39,8 @@ int main() noexcept {
     printf("Watching: %S\n", directoryToWatch.c_str());
 
     g_exitEvent = CreateEventW(nullptr, true, false, nullptr);
-	myassert(g_exitEvent, "");
-	myassert(SetConsoleCtrlHandler(CtrlHandler, true), "");
+    myassert(g_exitEvent, "");
+    myassert(SetConsoleCtrlHandler(CtrlHandler, true), "");
 	
     myassert(hChangeEvent = CreateEventW(nullptr, true, false, nullptr), "");
     overlapped.hEvent = hChangeEvent;
@@ -55,11 +55,11 @@ int main() noexcept {
             FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME | FILE_NOTIFY_CHANGE_LAST_WRITE,
             &bytesReturned, &overlapped, nullptr), "");
         myassert((waitStatus = WaitForMultipleObjects(2, handles, false, INFINITE)) != WAIT_FAILED, "");
-		if (waitStatus == WAIT_OBJECT_0 + 0) {
+        if (waitStatus == WAIT_OBJECT_0 + 0) {
             break;
         } else if (waitStatus == WAIT_OBJECT_0 + 1) {
             FILE_NOTIFY_INFORMATION* info = reinterpret_cast<FILE_NOTIFY_INFORMATION*>(buffer);
-            do {
+            while (running) {
                 std::error_code ec;
                 auto fullPath = std::filesystem::weakly_canonical(directoryToWatch / std::wstring(info->FileName, info->FileNameLength / sizeof(WCHAR)), ec);
                 if (!ec) {
@@ -78,18 +78,18 @@ int main() noexcept {
                         if (ec) printf("Error updating timestamp for \"%S\": %s\n", currentPath.c_str(), ec.message().c_str());
                     }
                 } else {
-                    printf("Change detected, but error on: \"%S \\ %S\".\n", directoryToWatch.c_str(), info->FileName);
+                    printf("Change detected, but unable to process: \"%S\\%S\".\n", directoryToWatch.c_str(), info->FileName);
                 }
                 if (!info->NextEntryOffset) break;
                 info = reinterpret_cast<FILE_NOTIFY_INFORMATION*>(reinterpret_cast<BYTE*>(info) + info->NextEntryOffset);
-            } while (true);
+            }
             ResetEvent(hChangeEvent);
         }
     }
 
-	CloseHandle(hDir);
+    CloseHandle(hDir);
     CloseHandle(hChangeEvent);
     CloseHandle(g_exitEvent);
 
-	return 0;
+    return 0;
 }
