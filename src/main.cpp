@@ -64,19 +64,20 @@ int main() noexcept {
                 auto fullPath = std::filesystem::weakly_canonical(directoryToWatch / std::wstring(info->FileName, info->FileNameLength / sizeof(WCHAR)), ec);
                 if (!ec) {
                     auto timestamp = std::filesystem::last_write_time(fullPath, ec);
-                    if (ec) timestamp = std::filesystem::file_time_type::clock::now();
-                    auto currentPath = fullPath;
+                    if (!ec) {
+                        auto currentPath = fullPath;
 
-                    printf("Change detected: \"%S\"@%lld.\n", fullPath.wstring().c_str(), std::chrono::duration_cast<std::chrono::seconds>(timestamp.time_since_epoch()).count());
-                    while (currentPath > directoryToWatch && currentPath.has_parent_path()) {
-                        currentPath = currentPath.parent_path();
-                        if (currentPath < directoryToWatch) break;
-                        auto currentPathTimestamp = std::filesystem::last_write_time(currentPath, ec);
-                        if (ec || currentPathTimestamp == timestamp) continue;
-                        printf("Manipulating \"%S\"@%lld.\n", currentPath.c_str(), std::chrono::duration_cast<std::chrono::seconds>(timestamp.time_since_epoch()).count());
-                        std::filesystem::last_write_time(currentPath, timestamp, ec);
-                        if (ec) printf("Error updating timestamp for \"%S\": %s\n", currentPath.c_str(), ec.message().c_str());
-                    }
+                        printf("Change detected: \"%S\"@%lld.\n", fullPath.wstring().c_str(), std::chrono::duration_cast<std::chrono::seconds>(timestamp.time_since_epoch()).count());
+                        while (currentPath > directoryToWatch && currentPath.has_parent_path()) {
+                            currentPath = currentPath.parent_path();
+                            if (currentPath < directoryToWatch) break;
+                            auto currentPathTimestamp = std::filesystem::last_write_time(currentPath, ec);
+                            if (ec || currentPathTimestamp == timestamp || std::abs(currentPathTimestamp.time_since_epoch().count() - timestamp.time_since_epoch().count()) <= 1) continue;
+                            printf("Manipulating \"%S\"@%lld.\n", currentPath.c_str(), std::chrono::duration_cast<std::chrono::seconds>(timestamp.time_since_epoch()).count());
+                            std::filesystem::last_write_time(currentPath, timestamp, ec);
+                            if (ec) printf("Error updating timestamp for \"%S\": %s\n", currentPath.c_str(), ec.message().c_str());
+                        }
+                    } else printf("Error getting timestamp for \"%S\": %s\n", fullPath.c_str(), ec.message().c_str());
                 } else {
                     printf("Change detected, but unable to process: \"%S\\%S\".\n", directoryToWatch.c_str(), info->FileName);
                 }
